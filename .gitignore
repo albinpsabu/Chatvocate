@@ -25,3 +25,10 @@ chroma_db/
 .idea/
 .DS_Store
 Thumbs.db
+
+
+# Uploaded PDF files
+backend/media/
+
+# ChromaDB local storage
+backend/chroma_db/
