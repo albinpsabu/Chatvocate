@@ -12,6 +12,10 @@ OPENAI_EMBEDDING_MODEL = os.getenv(
     "OPENAI_EMBEDDING_MODEL",
     "text-embedding-3-small"
 )
+OPENAI_CHAT_MODEL=os.getenv(
+    "OPENAI_CHAT_MODEL",
+    "gpt-5.5"
+)
 CHROMA_DB_PATH = BASE_DIR / os.getenv(
     "CHROMA_DB_PATH",
     "chroma_db"
