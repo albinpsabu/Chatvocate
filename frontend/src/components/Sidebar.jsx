@@ -2,73 +2,83 @@
 function Sidebar({ onUpload, onNewChat }) {
   return (
     <aside className="sidebar d-flex flex-column p-3">
-      <a
-        href="#workspace"
-        className="brand d-flex align-items-center gap-2 text-decoration-none mb-4"
-      >
-        <span className="brand-icon">
-          <i className="bi bi-stars"></i>
-        </span>
+      {/* Brand */}
+      <div className="sidebar-brand d-flex align-items-center justify-content-between mb-4">
+        <a
+          href="#chat"
+          className="d-flex align-items-center gap-2 text-decoration-none"
+        >
+          <span className="sidebar-brand-icon">
+            <i className="bi bi-stars"></i>
+          </span>
 
-        <span>
-          <strong className="brand-name d-block">Chatvocate</strong>
-          <small className="text-secondary">DOCUMENT AI</small>
-        </span>
-      </a>
-
-      <button
-        className="btn btn-primary w-100 mb-4"
-        onClick={onNewChat}
-      >
-        <i className="bi bi-plus-lg me-2"></i>
-        New conversation
-      </button>
-
-      <div className="sidebar-label">WORKSPACE</div>
-
-      <nav className="nav nav-pills flex-column gap-2">
-        <a className="nav-link active" href="#chat">
-          <i className="bi bi-chat-dots me-2"></i>
-          AI Chat
+          <span className="sidebar-brand-name">Chatvocate</span>
         </a>
 
         <button
-          className="nav-link text-start"
-          onClick={onUpload}
+          type="button"
+          className="btn sidebar-icon-button"
+          aria-label="Toggle sidebar"
+          title="Sidebar"
         >
-          <i className="bi bi-cloud-arrow-up me-2"></i>
-          Upload documents
+          <i className="bi bi-layout-sidebar"></i>
         </button>
+      </div>
 
-        <a className="nav-link" href="#documents">
-          <i className="bi bi-folder2-open me-2"></i>
-          My documents
-        </a>
+      {/* New chat */}
+      <button
+        type="button"
+        className="sidebar-action d-flex align-items-center gap-3"
+        onClick={onNewChat}
+      >
+        <i className="bi bi-plus-circle"></i>
+        <span>New chat</span>
+      </button>
 
-        <a className="nav-link" href="#sources">
-          <i className="bi bi-journal-text me-2"></i>
-          Sources
-        </a>
-      </nav>
+      {/* Upload document */}
+      <button
+        type="button"
+        className="sidebar-action d-flex align-items-center gap-3"
+        onClick={onUpload}
+      >
+        <i className="bi bi-paperclip"></i>
+        <span>Upload document</span>
+      </button>
 
-      <div className="sidebar-bottom mt-auto">
-        <div className="sidebar-info rounded-3 p-3">
-          <i className="bi bi-shield-check fs-4"></i>
+      {/* Document library */}
+      <a
+        href="#documents"
+        className="sidebar-action d-flex align-items-center gap-3 text-decoration-none"
+      >
+        <i className="bi bi-folder2-open"></i>
+        <span>My documents</span>
+      </a>
 
-          <h6 className="mt-2">Answers with context</h6>
-
-          <p className="small text-secondary mb-0">
-            Explore your documents through AI-powered search and answers.
-          </p>
+      {/* Recent chats placeholder */}
+      <div className="sidebar-history mt-4">
+        <div className="sidebar-section-label mb-2">
+          Recent
         </div>
 
-        <div className="d-flex align-items-center gap-2 pt-3">
-          <div className="guest-avatar">G</div>
+        <div className="sidebar-empty-history">
+          <i className="bi bi-chat-left-text me-2"></i>
+          Your conversations will appear here.
+        </div>
+      </div>
 
-          <div>
-            <div className="small fw-semibold">Guest workspace</div>
-            <div className="small text-secondary">Public access</div>
+      {/* Footer */}
+      <div className="sidebar-footer mt-auto pt-3">
+        <div className="sidebar-footer-card d-flex align-items-center gap-2">
+          <div className="sidebar-user-avatar">G</div>
+
+          <div className="flex-grow-1">
+            <div className="sidebar-user-name">Guest workspace</div>
+            <div className="sidebar-user-status">
+              Public access
+            </div>
           </div>
+
+          <i className="bi bi-three-dots"></i>
         </div>
       </div>
     </aside>

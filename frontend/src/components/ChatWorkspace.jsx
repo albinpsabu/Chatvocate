@@ -1,13 +1,33 @@
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
-function ChatWorkspace({
-  document,
-  messages,
-  onAsk,
-  loading,
-}) {
+function ChatWorkspace({ document, messages, onAsk, loading }) {
   const [question, setQuestion] = useState("");
+  const [pendingQuestion, setPendingQuestion] = useState("");
+
+  const suggestions = [
+    {
+      icon: "bi-file-text",
+      title: "Summarize this document",
+      prompt: "Summarize this document and list its key points.",
+    },
+    {
+      icon: "bi-search",
+      title: "Find important details",
+      prompt: "What are the most important details in this document?",
+    },
+    {
+      icon: "bi-lightbulb",
+      title: "Explain a concept",
+      prompt: "Explain the main concepts in this document simply.",
+    },
+    {
+      icon: "bi-list-check",
+      title: "Extract key points",
+      prompt: "List the key facts, dates, and important information.",
+    },
+  ];
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -17,205 +37,287 @@ function ChatWorkspace({
     if (!trimmedQuestion || loading) return;
 
     setQuestion("");
-    await onAsk(trimmedQuestion);
+    setPendingQuestion(trimmedQuestion);
+
+    try {
+      await onAsk(trimmedQuestion);
+    } finally {
+      setPendingQuestion("");
+    }
   }
 
-  const suggestions = [
-    {
-      icon: "bi-file-text",
-      title: "Summarize this document",
-      prompt: "Summarize the document and identify its key points.",
-    },
-    {
-      icon: "bi-search",
-      title: "Find key information",
-      prompt: "What are the most important points in this document?",
-    },
-    {
-      icon: "bi-lightbulb",
-      title: "Explain a concept",
-      prompt: "Explain the main concepts in this document.",
-    },
-    {
-      icon: "bi-list-check",
-      title: "Extract key points",
-      prompt: "List the key facts and important details in this document.",
-    },
-  ];
+  function handleSuggestion(prompt) {
+    setQuestion(prompt);
+  }
+
+  const showWelcome =
+    messages.length === 0 && !pendingQuestion;
 
   return (
-    <section id="chat" className="chat-workspace card mt-4">
-      <div className="card-header chat-header d-flex align-items-center gap-3">
-        <span className="pdf-icon">
-          <i className="bi bi-file-earmark-text"></i>
-        </span>
-
-        <div className="flex-grow-1 min-w-0">
-          <div className="fw-semibold text-truncate">
-            {document?.title || "Choose a document"}
-          </div>
-          <div className="small text-secondary">
-            Document Q&A
-          </div>
-        </div>
-
-        <span className="badge rounded-pill text-bg-secondary">
-          Public
-        </span>
-      </div>
-
-      <div className="card-body chat-body">
-        {messages.length === 0 ? (
-          <div className="chat-welcome text-center">
-            <div className="assistant-icon mx-auto mb-3">
+    <section className="chat-workspace">
+      {/* Conversation messages */}
+      <div className="chat-conversation">
+        {showWelcome ? (
+          <div className="chat-welcome-screen">
+            <div className="chat-welcome-icon">
               <i className="bi bi-stars"></i>
             </div>
 
-            <h4 className="section-title">
+            <h1>
               What would you like to know?
-            </h4>
+            </h1>
 
-            <p className="text-secondary small mx-auto welcome-description">
-              Ask a question about your documents or choose one of the
-              suggestions below.
+            <p>
+              Ask questions about your documents and get answers
+              supported by relevant source passages.
             </p>
 
-            <div className="row g-2 mt-4 text-start">
+            {document ? (
+              <div className="active-document-pill">
+                <i className="bi bi-file-earmark-pdf"></i>
+                <span>{document.title}</span>
+                <i className="bi bi-check-circle-fill"></i>
+              </div>
+            ) : (
+              <div className="welcome-upload-hint">
+                <i className="bi bi-paperclip me-2"></i>
+                Upload a PDF to get started.
+              </div>
+            )}
+
+            <div className="chat-suggestions">
               {suggestions.map((item) => (
-                <div className="col-12 col-sm-6" key={item.title}>
-                  <button
-                    className="suggestion-card w-100 text-start"
-                    onClick={() => setQuestion(item.prompt)}
-                    disabled={!document || loading}
-                  >
-                    <i className={`bi ${item.icon} me-2`}></i>
-                    {item.title}
-                    <i className="bi bi-arrow-up-right ms-auto"></i>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="chat-suggestion"
+                  key={item.title}
+                  onClick={() => handleSuggestion(item.prompt)}
+                  disabled={!document || loading}
+                >
+                  <i className={`bi ${item.icon}`}></i>
+
+                  <span>{item.title}</span>
+
+                  <i className="bi bi-arrow-up-right suggestion-arrow"></i>
+                </button>
               ))}
             </div>
           </div>
         ) : (
-          <div className="message-list">
+          <div className="chat-message-list">
             {messages.map((message, index) => (
-              <div className="mb-4" key={message.id || index}>
-                <div className="d-flex justify-content-end mb-3">
-                  <div className="user-bubble">
+              <article
+                className="chat-message-pair"
+                key={message.id || index}
+              >
+                {/* User message */}
+                <div className="chat-user-message">
+                  <div className="chat-user-avatar">G</div>
+
+                  <div className="chat-user-text">
                     {message.question}
                   </div>
                 </div>
 
-                {message.error ? (
-                  <div className="alert alert-danger py-2 small">
-                    {message.error}
+                {/* Assistant answer or error */}
+                <div className="chat-assistant-message">
+                  <div className="chat-assistant-avatar">
+                    <i className="bi bi-stars"></i>
                   </div>
-                ) : (
-                  <div className="assistant-message">
-                    <div className="d-flex align-items-center gap-2 mb-2">
-                      <span className="assistant-icon small-assistant-icon">
-                        <i className="bi bi-stars"></i>
-                      </span>
-                      <strong className="small">Chatvocate AI</strong>
+
+                  <div className="chat-assistant-content">
+                    <div className="chat-assistant-label">
+                      Chatvocate
                     </div>
 
-                    <div className="answer-text">
-                      {message.answer || "No answer was returned."}
-                    </div>
-
-                    {message.sources?.length > 0 && (
-                      <div className="mt-3">
-                        <div className="small fw-semibold mb-2">
-                          Supporting sources
-                        </div>
-
-                        <div className="d-flex flex-wrap gap-2">
-                          {message.sources.map((source, sourceIndex) => (
-                            <span
-                              className="source-chip"
-                              key={`${source.source}-${sourceIndex}`}
-                              title={source.excerpt}
-                            >
-                              <i className="bi bi-file-earmark-text me-1"></i>
-                              {source.document_title || "Document"}
-                              {source.page_number != null
-                                ? ` · Page ${source.page_number}`
-                                : ""}
-                            </span>
-                          ))}
-                        </div>
-
-                        <div className="source-excerpts mt-3">
-                          {message.sources.map((source, sourceIndex) => (
-                            <details
-                              className="source-detail"
-                              key={`${source.source}-${sourceIndex}`}
-                            >
-                              <summary>
-                                Source {source.source}
-                                {source.page_number != null
-                                  ? ` — Page ${source.page_number}`
-                                  : ""}
-                              </summary>
-
-                              <p className="small text-secondary mt-2 mb-0">
-                                {source.excerpt}
-                              </p>
-                            </details>
-                          ))}
-                        </div>
+                    {message.error ? (
+                      <div className="alert alert-danger py-2">
+                        {message.error}
                       </div>
+                    ) : (
+                      <>
+                        <div className="chat-answer-markdown">
+                          <ReactMarkdown>
+                            {message.answer || ""}
+                          </ReactMarkdown>
+                        </div>
+
+                        {message.sources?.length > 0 && (
+                          <div className="chat-answer-sources">
+                            <div className="sources-heading">
+                              <i className="bi bi-journal-text me-2"></i>
+                              Sources
+                              <span className="sources-count">
+                                {message.sources.length}
+                              </span>
+                            </div>
+
+                            <div className="source-chips">
+                              {message.sources.map((source, sourceIndex) => (
+                                <a
+                                  key={`${source.source}-${sourceIndex}`}
+                                  className="source-chip"
+                                  href={`#source-${message.id || index}-${source.source}`}
+                                  title={source.excerpt || ""}
+                                >
+                                  <i className="bi bi-file-earmark-text"></i>
+
+                                  <span>
+                                    {source.document_title || "Document"}
+                                    {source.page_number != null
+                                      ? ` · Page ${source.page_number}`
+                                      : ""}
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+
+                            <div className="source-details-list">
+                              {message.sources.map((source, sourceIndex) => (
+                                <details
+                                  className="source-detail"
+                                  id={`source-${message.id || index}-${source.source}`}
+                                  key={`${source.source}-${sourceIndex}`}
+                                >
+                                  <summary>
+                                    <span>
+                                      <i className="bi bi-file-text me-2"></i>
+                                      Source {source.source}
+                                      {source.page_number != null
+                                        ? ` · Page ${source.page_number}`
+                                        : ""}
+                                    </span>
+
+                                    <i className="bi bi-chevron-down"></i>
+                                  </summary>
+
+                                  <div className="source-detail-content">
+                                    <div className="source-document-title">
+                                      {source.document_title || "Document"}
+                                    </div>
+
+                                    <p>
+                                      {source.excerpt ||
+                                        "No excerpt is available."}
+                                    </p>
+                                  </div>
+                                </details>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+              </article>
             ))}
-          </div>
-        )}
 
-        {loading && (
-          <div className="d-flex align-items-center gap-2 small text-secondary py-3">
-            <span className="spinner-border spinner-border-sm"></span>
-            Searching the indexed documents and generating an answer...
+            {/* Show the new question while waiting for Django/OpenAI */}
+            {pendingQuestion && (
+              <article className="chat-message-pair">
+                <div className="chat-user-message">
+                  <div className="chat-user-avatar">G</div>
+
+                  <div className="chat-user-text">
+                    {pendingQuestion}
+                  </div>
+                </div>
+
+                <div className="chat-assistant-message">
+                  <div className="chat-assistant-avatar">
+                    <i className="bi bi-stars"></i>
+                  </div>
+
+                  <div className="chat-assistant-content">
+                    <div className="chat-assistant-label">
+                      Chatvocate
+                    </div>
+
+                    <div className="chat-loading">
+                      <span className="spinner-grow spinner-grow-sm"></span>
+                      <span>
+                        Searching documents and preparing an answer...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            )}
+
+            <div className="chat-bottom-anchor"></div>
           </div>
         )}
       </div>
 
-      <div className="card-footer composer-footer">
-        <form className="chat-composer d-flex align-items-center gap-2" onSubmit={handleSubmit}>
-          <i className="bi bi-chat-left-text text-secondary"></i>
-
-          <input
-            className="form-control border-0 shadow-none"
-            type="text"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
+      {/* Message composer */}
+      <div className="chat-composer-area">
+        <form
+          className="chat-composer-form"
+          onSubmit={handleSubmit}
+        >
+          <textarea
+            className="chat-message-input"
             placeholder={
               document
-                ? "Ask a question about your documents..."
-                : "Upload or select a document first"
+                ? "Ask anything about your document..."
+                : "Upload a PDF to begin..."
             }
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            rows={1}
             disabled={!document || loading}
-            aria-label="Your question"
+            aria-label="Ask a question"
           />
 
-          <button
-            className="btn btn-primary send-button"
-            type="submit"
-            disabled={!document || !question.trim() || loading}
-            aria-label="Send question"
-          >
-            {loading ? (
-              <span className="spinner-border spinner-border-sm"></span>
-            ) : (
-              <i className="bi bi-arrow-up"></i>
-            )}
-          </button>
+          <div className="chat-composer-toolbar">
+            <div className="composer-left">
+              <span className="composer-context">
+                <i className="bi bi-file-earmark-text me-1"></i>
+
+                {document
+                  ? document.title
+                  : "No document selected"}
+              </span>
+            </div>
+
+            <div className="composer-right">
+              <span className="composer-hint">
+                Enter to send · Shift + Enter for a new line
+              </span>
+
+              <button
+                type="submit"
+                className="chat-send-button"
+                disabled={
+                  !document || !question.trim() || loading
+                }
+                aria-label="Send question"
+                title="Send message"
+              >
+                {loading ? (
+                  <span className="spinner-border spinner-border-sm"></span>
+                ) : (
+                  <i className="bi bi-arrow-up"></i>
+                )}
+              </button>
+            </div>
+          </div>
         </form>
 
-        <p className="text-center text-secondary small mt-2 mb-0">
-          AI-generated answers may contain errors. Verify important information
-          against the source document.
+        <p className="chat-disclaimer">
+          Chatvocate can make mistakes. Verify important information
+          against your original document.
         </p>
       </div>
     </section>

@@ -2,11 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import Sidebar from "./components/Sidebar";
-import Topbar from "./components/Topbar";
-import UploadPanel from "./components/UploadPanel";
 import DocumentList from "./components/DocumentList";
 import ChatWorkspace from "./components/ChatWorkspace";
-import RightPanel from "./components/RightPanel";
 
 import {
   getDocuments,
@@ -14,56 +11,44 @@ import {
   askQuestion,
 } from "./services/api";
 
+function normalizeDocuments(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.results)) return data.results;
+  return [];
+}
+
 function App() {
-  // Shared file input used by the sidebar and upload panel.
-  const inputActionRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [documents, setDocuments] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [messages, setMessages] = useState([]);
-
   const [search, setSearch] = useState("");
+
   const [loadingDocuments, setLoadingDocuments] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
 
   const [error, setError] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [chatKey, setChatKey] = useState(0);
 
-  // Normalize ordinary and paginated Django REST responses.
-  function normalizeDocumentList(data) {
-    if (Array.isArray(data)) {
-      return data;
-    }
-
-    if (Array.isArray(data?.results)) {
-      return data.results;
-    }
-
-    return [];
-  }
-
-  // Load documents already stored in Django.
+  // Load documents saved in Django.
   const loadDocuments = useCallback(async () => {
     setLoadingDocuments(true);
-    setError("");
 
     try {
       const data = await getDocuments();
-      const list = normalizeDocumentList(data);
+      const list = normalizeDocuments(data);
 
       setDocuments(list);
 
       setSelectedDocument((current) => {
         if (current) {
-          const updatedDocument = list.find(
-            (item) => String(item.id) === String(current.id)
+          return (
+            list.find(
+              (item) => String(item.id) === String(current.id)
+            ) || list[0] || null
           );
-
-          if (updatedDocument) {
-            return updatedDocument;
-          }
         }
 
         return list[0] || null;
@@ -71,7 +56,7 @@ function App() {
     } catch (err) {
       setError(
         err.response?.data?.detail ||
-          "Unable to load documents. Make sure the Django backend is running."
+          "Could not load documents. Check whether Django is running."
       );
     } finally {
       setLoadingDocuments(false);
@@ -82,40 +67,46 @@ function App() {
     loadDocuments();
   }, [loadDocuments]);
 
-  // Upload a PDF through the Django document endpoint.
+  // Upload a PDF to the Django backend.
   async function handleUpload(file) {
-    if (!file) return;
+    if (!file || uploading) return;
 
-    setError("");
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please select a PDF document.");
+      return;
+    }
+
     setUploading(true);
+    setError("");
 
     try {
-      const uploadedDocument = await uploadDocument(file);
+      const uploaded = await uploadDocument(file);
 
-      // Refresh the list from the backend after uploading.
       const data = await getDocuments();
-      const list = normalizeDocumentList(data);
+      const list = normalizeDocuments(data);
 
       setDocuments(list);
 
-      const newDocument = list.find(
-        (item) => String(item.id) === String(uploadedDocument.id)
-      );
+      const newDocument =
+        list.find(
+          (item) => String(item.id) === String(uploaded.id)
+        ) ||
+        list.find((item) => item.title === uploaded.title) ||
+        uploaded;
 
-      setSelectedDocument(newDocument || uploadedDocument);
+      setSelectedDocument(newDocument);
       setMessages([]);
-      setChatKey((current) => current + 1);
     } catch (err) {
       setError(
         err.response?.data?.detail ||
-          "Document upload failed. Check the backend and try again."
+          "Upload failed. Please try again."
       );
     } finally {
       setUploading(false);
     }
   }
 
-  // Send a question to the Django chat endpoint.
+  // Ask a question through the existing Django chat endpoint.
   async function handleAsk(question) {
     if (!question.trim() || sending) return;
 
@@ -125,25 +116,24 @@ function App() {
     try {
       const data = await askQuestion(question);
 
-      const newMessage = {
-        id: `${Date.now()}-${Math.random()}`,
-        question: data.question || question,
-        answer: data.answer || "",
-        sources: Array.isArray(data.sources) ? data.sources : [],
-      };
-
-      setMessages((current) => [...current, newMessage]);
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          question: data.question || question,
+          answer: data.answer || "",
+          sources: Array.isArray(data.sources) ? data.sources : [],
+        },
+      ]);
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.detail ||
-        "Unable to get an answer. Please check your connection and try again.";
-
-      setMessages((current) => [
-        ...current,
+      setMessages((previous) => [
+        ...previous,
         {
           id: `${Date.now()}-${Math.random()}`,
           question,
-          error: errorMessage,
+          error:
+            err.response?.data?.detail ||
+            "Unable to get an answer. Please try again.",
         },
       ]);
     } finally {
@@ -151,117 +141,185 @@ function App() {
     }
   }
 
-  // Start a fresh conversation without deleting documents.
   function handleNewChat() {
     setMessages([]);
     setError("");
-    setChatKey((current) => current + 1);
+    setMobileMenuOpen(false);
   }
 
-  // Open the file picker shared with UploadPanel.
-  function handleUploadButton() {
-    if (!uploading) {
-      inputActionRef.current?.click();
-    }
-  }
-
-  // Select a document and clear the previous conversation.
-  function handleDocumentSelect(document) {
+  function handleSelectDocument(document) {
     setSelectedDocument(document);
     setMessages([]);
-    setChatKey((current) => current + 1);
+    setMobileMenuOpen(false);
   }
 
   return (
-    <div className="app-shell">
-      {/* Mobile navigation overlay */}
+    <div className="chatvocate-app">
+      {/* Mobile sidebar overlay */}
       {mobileMenuOpen && (
         <button
           type="button"
-          className="mobile-overlay"
-          aria-label="Close navigation"
+          className="chat-mobile-overlay"
+          aria-label="Close sidebar"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Left sidebar */}
+      {/* Left navigation */}
       <div
-        className={`sidebar-wrap ${
-          mobileMenuOpen ? "sidebar-open" : ""
+        className={`chat-sidebar-container ${
+          mobileMenuOpen ? "mobile-sidebar-open" : ""
         }`}
       >
         <Sidebar
-          onUpload={handleUploadButton}
+          onUpload={() => fileInputRef.current?.click()}
           onNewChat={handleNewChat}
         />
       </div>
 
-      {/* Main workspace */}
-      <main className="main-content">
-        <Topbar
-          search={search}
-          setSearch={setSearch}
-          onMenuClick={() => setMobileMenuOpen(true)}
-        />
-
-        <div className="container-fluid dashboard-container">
-          {/* Error messages */}
-          {error && (
-            <div
-              className="alert alert-danger alert-dismissible fade show mt-3"
-              role="alert"
+      {/* Main conversation workspace */}
+      <main className="chat-main">
+        <header className="chat-topbar d-flex align-items-center justify-content-between px-3 px-lg-4">
+          <div className="d-flex align-items-center gap-2">
+            <button
+              type="button"
+              className="btn chat-mobile-menu"
+              aria-label="Open sidebar"
+              onClick={() => setMobileMenuOpen(true)}
             >
-              {error}
+              <i className="bi bi-list fs-5"></i>
+            </button>
 
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Dismiss"
-                onClick={() => setError("")}
-              />
-            </div>
-          )}
-
-          {/* Document upload */}
-          <UploadPanel
-            onUpload={handleUpload}
-            uploading={uploading}
-            inputActionRef={inputActionRef}
-          />
-
-          {/* Uploaded document library */}
-          <DocumentList
-            documents={documents}
-            selectedDocumentId={selectedDocument?.id}
-            onSelect={handleDocumentSelect}
-            search={search}
-            loading={loadingDocuments}
-          />
-
-          {/* Current backend limitation */}
-          <div className="alert alert-warning small mt-4" role="note">
-            <i className="bi bi-info-circle me-2"></i>
-            Document-specific retrieval is still being implemented.
-            Answers may currently use passages from the shared ChromaDB
-            collection rather than exclusively from the selected document.
+            <span className="chat-topbar-title">Chatvocate</span>
+            <i className="bi bi-chevron-down small text-secondary"></i>
           </div>
 
-          {/* Chat and answer citations */}
-          <ChatWorkspace
-            key={chatKey}
-            document={selectedDocument}
-            messages={messages}
-            onAsk={handleAsk}
-            loading={sending}
+          <button
+            type="button"
+            className="btn chat-upload-button"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? (
+              <span className="spinner-border spinner-border-sm me-2" />
+            ) : (
+              <i className="bi bi-paperclip me-2"></i>
+            )}
+            <span>Upload PDF</span>
+          </button>
+
+          {/* Shared PDF picker for the sidebar and header */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+
+              if (file) {
+                handleUpload(file);
+              }
+
+              event.target.value = "";
+            }}
           />
+        </header>
+
+        <div className="chat-page-content">
+          <div className="chat-center-column">
+            {error && (
+              <div className="alert alert-danger small" role="alert">
+                <i className="bi bi-exclamation-circle me-2"></i>
+                {error}
+                <button
+                  type="button"
+                  className="btn-close ms-2"
+                  aria-label="Dismiss"
+                  onClick={() => setError("")}
+                />
+              </div>
+            )}
+
+            {/* Compact document selector */}
+            <details className="document-library" id="documents">
+              <summary>
+                <span>
+                  <i className="bi bi-folder2-open me-2"></i>
+                  My documents
+                </span>
+
+                <span className="document-library-count">
+                  {loadingDocuments ? "Loading..." : documents.length}
+                </span>
+              </summary>
+
+              <div className="document-library-content">
+                <div className="mb-3">
+                  <input
+                    type="search"
+                    className="form-control document-search"
+                    placeholder="Find a document..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    aria-label="Search documents"
+                  />
+                </div>
+
+                <DocumentList
+                  documents={documents}
+                  selectedDocumentId={selectedDocument?.id}
+                  onSelect={handleSelectDocument}
+                  search={search}
+                  loading={loadingDocuments}
+                />
+              </div>
+            </details>
+
+            {/* Selected file status */}
+            {selectedDocument && (
+              <div className="selected-document-bar">
+                <i className="bi bi-file-earmark-pdf"></i>
+
+                <div className="selected-document-info">
+                  <span className="selected-document-label">
+                    CURRENT DOCUMENT
+                  </span>
+
+                  <strong title={selectedDocument.title}>
+                    {selectedDocument.title}
+                  </strong>
+                </div>
+
+                <span
+                  className={`document-status ${
+                    selectedDocument.processed ? "status-ready" : ""
+                  }`}
+                >
+                  <i className="bi bi-circle-fill me-1"></i>
+                  {selectedDocument.processed
+                    ? "Processed"
+                    : "Pending"}
+                </span>
+              </div>
+            )}
+
+            {/* Conversation and composer */}
+            <ChatWorkspace
+              document={selectedDocument}
+              messages={messages}
+              onAsk={handleAsk}
+              loading={sending}
+            />
+
+            <p className="chat-privacy-note">
+              <i className="bi bi-info-circle me-1"></i>
+              AI responses can contain errors. Verify important information
+              against the original document.
+            </p>
+          </div>
         </div>
       </main>
-
-      {/* Right panel: document details and answer sources */}
-      <RightPanel
-        document={selectedDocument}
-        messages={messages}
-      />
     </div>
   );
 }
